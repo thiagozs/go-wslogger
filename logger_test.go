@@ -2,9 +2,11 @@ package logger
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
+	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -126,5 +128,97 @@ func TestLogger_WithOtelSpan(t *testing.T) {
 	}
 	if !strings.Contains(out, "log with trace") || !strings.Contains(out, "foo=bar") {
 		t.Errorf("Log missing expected content: %q", out)
+	}
+}
+
+func TestLogger_JSONOutput(t *testing.T) {
+	var buf strings.Builder
+	l := NewLogger(
+		WithWriter(&buf),
+		WithJSON(true),
+	)
+
+	tp := sdktrace.NewTracerProvider()
+	tracer := tp.Tracer("test-logger")
+	ctx, span := tracer.Start(context.Background(), "test-span")
+	defer span.End()
+
+	l.InfoCtx(ctx, "log as json", "foo", "bar")
+
+	var logRecord map[string]interface{}
+	if err := json.Unmarshal([]byte(buf.String()), &logRecord); err != nil {
+		t.Fatalf("Failed to unmarshal log json: %v", err)
+	}
+
+	if logRecord["message"] != "log as json" {
+		t.Errorf("JSON missing message: %v", logRecord)
+	}
+	if logRecord["trace_id"] != span.SpanContext().TraceID().String() {
+		t.Errorf("JSON missing trace_id: %v", logRecord)
+	}
+	if logRecord["span_id"] != span.SpanContext().SpanID().String() {
+		t.Errorf("JSON missing span_id: %v", logRecord)
+	}
+	extra, ok := logRecord["extra"].(map[string]interface{})
+	if !ok || extra["foo"] != "bar" {
+		t.Errorf("JSON missing extra fields: %v", logRecord)
+	}
+}
+
+func TestLogger_JSON_WithSpanAttributes(t *testing.T) {
+	var buf strings.Builder
+	logger := NewLogger(
+		WithWriter(&buf),
+		WithJSON(true),
+		WithSpanAttributes(true),
+	)
+
+	// Cria contexto com span e atributos
+	tp := sdktrace.NewTracerProvider()
+	tracer := tp.Tracer("logger-test")
+	ctx, span := tracer.Start(context.Background(), "test-span")
+	span.SetAttributes(
+		attribute.String("user_id", "1234"),
+		attribute.String("custom_role", "superadmin"),
+	)
+	defer span.End()
+
+	// Inclui extra
+	logger.InfoCtx(ctx, "test message", "foo", "bar")
+
+	// Parse do JSON
+	var record map[string]interface{}
+	if err := json.Unmarshal([]byte(buf.String()), &record); err != nil {
+		t.Fatalf("failed to unmarshal log: %v\nlog line: %q", err, buf.String())
+	}
+
+	// Valida message
+	if record["message"] != "test message" {
+		t.Errorf("expected message %q, got %q", "test message", record["message"])
+	}
+
+	// Valida trace_id/span_id
+	traceID := span.SpanContext().TraceID().String()
+	spanID := span.SpanContext().SpanID().String()
+	if record["trace_id"] != traceID {
+		t.Errorf("expected trace_id %q, got %q", traceID, record["trace_id"])
+	}
+	if record["span_id"] != spanID {
+		t.Errorf("expected span_id %q, got %q", spanID, record["span_id"])
+	}
+
+	// Valida extras
+	extra, ok := record["extra"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("missing or invalid extra: %v", record["extra"])
+	}
+	if extra["foo"] != "bar" {
+		t.Errorf("expected foo=bar in extra, got %v", extra["foo"])
+	}
+	if extra["user_id"] != "1234" {
+		t.Errorf("expected user_id=1234 in extra, got %v", extra["user_id"])
+	}
+	if extra["custom_role"] != "superadmin" {
+		t.Errorf("expected custom_role=superadmin in extra, got %v", extra["custom_role"])
 	}
 }

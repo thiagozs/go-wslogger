@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -10,18 +11,21 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
 // Option define uma função de configuração para o Logger.
 type Option func(*Logger)
 
-// Logger é o nosso logger customizado.
+// Logger customizado.
 type Logger struct {
-	writer  io.Writer
-	format  string // Layout de formatação com placeholders.
-	appName string
-	color   bool
+	writer           io.Writer
+	format           string
+	appName          string
+	color            bool
+	jsonMode         bool
+	includeSpanAttrs bool
 }
 
 // Valores default.
@@ -39,7 +43,7 @@ const (
 	colorCyan   = "\033[36m"
 )
 
-// NewLogger cria um novo Logger com as opções fornecidas.
+// ==== Options ======
 func NewLogger(opts ...Option) *Logger {
 	l := &Logger{
 		writer:  os.Stdout,
@@ -53,14 +57,10 @@ func NewLogger(opts ...Option) *Logger {
 	return l
 }
 
-// WithWriter define um io.Writer customizado (por exemplo, para testes).
 func WithWriter(w io.Writer) Option {
-	return func(l *Logger) {
-		l.writer = w
-	}
+	return func(l *Logger) { l.writer = w }
 }
 
-// WithFormat define um layout customizado para os logs.
 func WithFormat(format string) Option {
 	return func(l *Logger) {
 		if format != "" {
@@ -69,18 +69,21 @@ func WithFormat(format string) Option {
 	}
 }
 
-// WithAppName define o nome da aplicação.
 func WithAppName(name string) Option {
-	return func(l *Logger) {
-		l.appName = name
-	}
+	return func(l *Logger) { l.appName = name }
 }
 
-// WithColor habilita ou desabilita o uso de cores.
 func WithColor(enable bool) Option {
-	return func(l *Logger) {
-		l.color = enable
-	}
+	return func(l *Logger) { l.color = enable }
+}
+
+func WithJSON(enable bool) Option {
+	return func(l *Logger) { l.jsonMode = enable }
+}
+
+// Ativa/desativa captura automática de atributos do span OTel
+func WithSpanAttributes(enable bool) Option {
+	return func(l *Logger) { l.includeSpanAttrs = enable }
 }
 
 // KeyValuePair representa um par chave-valor.
@@ -89,8 +92,6 @@ type KeyValuePair struct {
 	value string
 }
 
-// parseLogArgs extrai a mensagem principal e os pares chave-valor (se houver).
-// O primeiro parâmetro é a mensagem e os demais devem vir em pares.
 func parseLogArgs(args ...interface{}) (string, []KeyValuePair) {
 	if len(args) == 0 {
 		return "", nil
@@ -106,8 +107,6 @@ func parseLogArgs(args ...interface{}) (string, []KeyValuePair) {
 	return mainMsg, extras
 }
 
-// formatValue formata um valor: se for string
-// e contiver espaço, envolve em aspas.
 func formatValue(v any) string {
 	s, ok := v.(string)
 	if ok {
@@ -119,7 +118,6 @@ func formatValue(v any) string {
 	return fmt.Sprint(v)
 }
 
-// getColorCode retorna o código ANSI de cor para um nível (sem reset).
 func getColorCode(level string) string {
 	switch level {
 	case "INFO":
@@ -135,19 +133,15 @@ func getColorCode(level string) string {
 	}
 }
 
-// formatMessage constrói a mensagem final substituindo os placeholders.
-// Placeholders suportados: {time}, {app_name}, {caller}, {level},
-// {message}, {trace_id}, {span_id} e {extra}.
 func (l *Logger) formatMessage(level, msg, extra string, t time.Time,
 	traceID, spanID, caller string) string {
-	// Aplica cor ao nível, se habilitado.
+
 	colorCode := ""
 	if l.color {
 		colorCode = getColorCode(level)
 		level = colorCode + level + colorReset
 	}
 
-	// Se os IDs estiverem preenchidos, monta as strings com os prefixos.
 	if traceID != "" {
 		traceID = "trace_id=" + traceID
 	}
@@ -169,15 +163,13 @@ func (l *Logger) formatMessage(level, msg, extra string, t time.Time,
 	formatted := l.format
 	for placeholder, value := range replacements {
 		if value == "" {
-			continue // ignora se o valor estiver vazio
+			continue
 		}
-
 		formatted = strings.ReplaceAll(formatted, placeholder, value)
 	}
 	return formatted
 }
 
-// getCaller retorna uma string com o arquivo, linha e função que chamou o log.
 func (l *Logger) getCaller(skip int) string {
 	pc, file, line, ok := runtime.Caller(skip)
 	if !ok {
@@ -192,13 +184,83 @@ func (l *Logger) getCaller(skip int) string {
 	return fmt.Sprintf("%s:%d,%s", fileBase, line, funcName)
 }
 
-// logInternal realiza o log: extrai trace, caller,
-// processa os extras e envia a mensagem formatada.
+// JSON struct para output
+type logJSON struct {
+	Time    string            `json:"time"`
+	Level   string            `json:"level"`
+	App     string            `json:"app_name"`
+	Caller  string            `json:"caller"`
+	Message string            `json:"message"`
+	TraceID string            `json:"trace_id,omitempty"`
+	SpanID  string            `json:"span_id,omitempty"`
+	Extra   map[string]string `json:"extra,omitempty"`
+}
+
+// Captura atributos do Span OTel para map[string]string
+func spanAttributesToMap(span trace.Span) map[string]string {
+	out := make(map[string]string)
+	if s, ok := span.(interface{ Attributes() []attribute.KeyValue }); ok {
+		for _, attr := range s.Attributes() {
+			out[string(attr.Key)] = attr.Value.Emit()
+		}
+	}
+	return out
+}
+
+// ====== JSON Output ======
+func (l *Logger) logInternalJSON(level, msg string,
+	extras []KeyValuePair, ctx context.Context) {
+
+	now := time.Now()
+	var traceID, spanID string
+	span := trace.SpanFromContext(ctx)
+	if span != nil {
+		sc := span.SpanContext()
+		if sc.IsValid() {
+			traceID = sc.TraceID().String()
+			spanID = sc.SpanID().String()
+		}
+	}
+	caller := l.getCaller(6)
+
+	// Monta extras explícitos
+	extraMap := make(map[string]string, len(extras))
+	for _, kv := range extras {
+		extraMap[kv.key] = kv.value
+	}
+
+	// Mescla atributos do span, sem sobrescrever extras explícitos
+	if l.includeSpanAttrs && span != nil {
+		for k, v := range spanAttributesToMap(span) {
+			if _, exists := extraMap[k]; !exists {
+				extraMap[k] = v
+			}
+		}
+	}
+
+	record := logJSON{
+		Time:    now.Format(time.RFC3339),
+		Level:   level,
+		App:     l.appName,
+		Caller:  caller,
+		Message: msg,
+		TraceID: traceID,
+		SpanID:  spanID,
+		Extra:   extraMap,
+	}
+	data, _ := json.Marshal(record)
+	fmt.Fprintln(l.writer, string(data))
+}
+
+// ====== logInternal SWITCH ======
 func (l *Logger) logInternal(level, msg string,
 	extras []KeyValuePair, ctx context.Context) {
+	if l.jsonMode {
+		l.logInternalJSON(level, msg, extras, ctx)
+		return
+	}
 	now := time.Now()
 
-	// Extrai dados de tracing, se houver.
 	var traceID, spanID string
 	if span := trace.SpanFromContext(ctx); span != nil {
 		sc := span.SpanContext()
@@ -207,12 +269,8 @@ func (l *Logger) logInternal(level, msg string,
 			spanID = sc.SpanID().String()
 		}
 	}
-
-	// Extrai informações do caller;
-	// skip ajustado para obter o chamador real.
 	caller := l.getCaller(6)
 
-	// Formata os extras, colorindo as chaves com o mesmo código do nível.
 	extraStr := ""
 	if len(extras) > 0 {
 		var parts []string
@@ -221,18 +279,14 @@ func (l *Logger) logInternal(level, msg string,
 			colorCode = getColorCode(level)
 		}
 		for _, kv := range extras {
-			// A chave é colorida.
 			keyColored := kv.key
 			if colorCode != "" {
 				keyColored = colorCode + kv.key + colorReset
 			}
 			parts = append(parts, fmt.Sprintf("%s=%s", keyColored, kv.value))
 		}
-
-		// Adiciona um único espaço antes dos extras.
 		extraStr = strings.Join(parts, " ")
 	}
-
 	output := l.formatMessage(level, msg, extraStr, now, traceID, spanID, caller)
 	fmt.Fprintln(l.writer, output)
 }
@@ -253,7 +307,6 @@ func (l *Logger) DebugCtx(ctx context.Context, args ...any) {
 	l.logWithArgs("DEBUG", args, ctx)
 }
 
-// logWithArgs processa os argumentos e chama o log interno.
 func (l *Logger) logWithArgs(level string, args []any, ctx context.Context) {
 	msg, extras := parseLogArgs(args...)
 	l.logInternal(level, msg, extras, ctx)
