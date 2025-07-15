@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/natefinch/lumberjack"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -86,13 +88,40 @@ func WithSpanAttributes(enable bool) Option {
 	return func(l *Logger) { l.includeSpanAttrs = enable }
 }
 
+func WithRotatingFile(filename string, maxSizeMB, maxBackups, maxAgeDays int, compress bool) Option {
+	return func(l *Logger) {
+		l.writer = &lumberjack.Logger{
+			Filename:   filename,
+			MaxSize:    maxSizeMB,  // megabytes por arquivo
+			MaxBackups: maxBackups, // quantos arquivos manter
+			MaxAge:     maxAgeDays, // dias até rodar
+			Compress:   compress,   // gzip rotacionados
+		}
+	}
+}
+
+func WithMultiWriter(filename string, maxSizeMB, maxBackups, maxAgeDays int, compress bool) Option {
+	return func(l *Logger) {
+		l.writer = io.MultiWriter(
+			os.Stdout,
+			&lumberjack.Logger{
+				Filename:   filename,
+				MaxSize:    maxSizeMB,
+				MaxBackups: maxBackups,
+				MaxAge:     maxAgeDays,
+				Compress:   compress,
+			},
+		)
+	}
+}
+
 // KeyValuePair representa um par chave-valor.
 type KeyValuePair struct {
 	key   string
 	value string
 }
 
-func parseLogArgs(args ...interface{}) (string, []KeyValuePair) {
+func parseLogArgs(args ...any) (string, []KeyValuePair) {
 	if len(args) == 0 {
 		return "", nil
 	}
@@ -298,14 +327,10 @@ func (l *Logger) Error(args ...any) { l.logWithArgs("ERROR", args, context.Backg
 func (l *Logger) Debug(args ...any) { l.logWithArgs("DEBUG", args, context.Background()) }
 
 // Métodos de log com contexto.
-func (l *Logger) InfoCtx(ctx context.Context, args ...any) { l.logWithArgs("INFO", args, ctx) }
-func (l *Logger) WarnCtx(ctx context.Context, args ...any) { l.logWithArgs("WARN", args, ctx) }
-func (l *Logger) ErrorCtx(ctx context.Context, args ...any) {
-	l.logWithArgs("ERROR", args, ctx)
-}
-func (l *Logger) DebugCtx(ctx context.Context, args ...any) {
-	l.logWithArgs("DEBUG", args, ctx)
-}
+func (l *Logger) InfoCtx(ctx context.Context, args ...any)  { l.logWithArgs("INFO", args, ctx) }
+func (l *Logger) WarnCtx(ctx context.Context, args ...any)  { l.logWithArgs("WARN", args, ctx) }
+func (l *Logger) ErrorCtx(ctx context.Context, args ...any) { l.logWithArgs("ERROR", args, ctx) }
+func (l *Logger) DebugCtx(ctx context.Context, args ...any) { l.logWithArgs("DEBUG", args, ctx) }
 
 func (l *Logger) logWithArgs(level string, args []any, ctx context.Context) {
 	msg, extras := parseLogArgs(args...)

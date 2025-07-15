@@ -3,9 +3,14 @@ package logger
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/natefinch/lumberjack"
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -187,7 +192,7 @@ func TestLogger_JSON_WithSpanAttributes(t *testing.T) {
 	logger.InfoCtx(ctx, "test message", "foo", "bar")
 
 	// Parse do JSON
-	var record map[string]interface{}
+	var record map[string]any
 	if err := json.Unmarshal([]byte(buf.String()), &record); err != nil {
 		t.Fatalf("failed to unmarshal log: %v\nlog line: %q", err, buf.String())
 	}
@@ -220,5 +225,59 @@ func TestLogger_JSON_WithSpanAttributes(t *testing.T) {
 	}
 	if extra["custom_role"] != "superadmin" {
 		t.Errorf("expected custom_role=superadmin in extra, got %v", extra["custom_role"])
+	}
+}
+
+func TestLogger_LogRotation(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "testlog.log")
+
+	log := NewLogger(
+		WithJSON(true),
+		WithRotatingFile(logFile, 1, 3, 1, false),
+	)
+
+	// 8KB por linha, 200 linhas = 1.6MB
+	bigMsg := strings.Repeat("Y", 8192)
+	lines := 200
+	for i := 0; i < lines; i++ {
+		log.Info(bigMsg, "i", strconv.Itoa(i))
+	}
+
+	// Força rotação explícita
+	if lj, ok := log.writer.(*lumberjack.Logger); ok {
+		_ = lj.Rotate()
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	files, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to read tmp log dir: %v", err)
+	}
+
+	for _, f := range files {
+		info, _ := f.Info()
+		t.Logf("Arquivo: %s (%d bytes)", f.Name(), info.Size())
+	}
+
+	foundMain := false
+	foundBackup := false
+
+	for _, f := range files {
+		if f.Name() == "testlog.log" {
+			foundMain = true
+		}
+		if strings.HasPrefix(f.Name(), "testlog-") && strings.HasSuffix(f.Name(), ".log") {
+			foundBackup = true
+		}
+	}
+
+	if !foundMain {
+		t.Error("Arquivo principal de log não foi criado")
+	}
+
+	if !foundBackup {
+		t.Error("Arquivo de backup (rotacionado) não foi criado")
 	}
 }

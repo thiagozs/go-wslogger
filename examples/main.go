@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
-	"os"
 
 	logger "github.com/thiagozs/go-logger"
 	sdk "go.opentelemetry.io/otel/sdk/trace"
@@ -30,27 +28,25 @@ func main() {
 	logr.ErrorCtx(ctx, "Log de erro com span", "err", "Falha na conexão", "retry", 3)
 	span.End()
 
-	// Redireciona a saída para um arquivo.
-	f, err := os.Create("log.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	fileLogger := logger.NewLogger(
-		logger.WithWriter(f),
-		logger.WithFormat("[{time}] [{app_name}] [{caller}] [{level}] {message} {extra}"),
-		logger.WithAppName("ExemploApp"),
-	)
-
-	fileLogger.Warn("Log escrito no arquivo", "foo", "bar")
-
+	// Exemplo de logger com JSON.
 	loggerJson := logger.NewLogger(
-		logger.WithFormat("{\"time\":\"{time}\", \"app_name\":\"{app_name}\", \"caller\":\"{caller}\", \"level\":\"{level}\", \"message\":\"{message}\", \"extra\": {extra}}"),
-		logger.WithAppName("ExemploApp"),
-		logger.WithColor(false),
+		logger.WithJSON(true),
+		logger.WithRotatingFile("json_log.txt", 1, 3, 1, false),
+		logger.WithAppName("JsonLogger"),
 	)
 
-	loggerJson.Warn("Log escrito no arquivo em JSON", "foo", "bar")
+	loggerJson.Info("Log em JSON", "user", "jane_doe", "action", "login")
+	loggerJson.Warn("Log de aviso em JSON", "foo", "bar", "status", "processing")
+	loggerJson.Error("Log de erro em JSON", "err", "Erro ao processar requisição", "code", 500)
+
+	loggerJsonMulti := logger.NewLogger(
+		logger.WithJSON(true),
+		logger.WithMultiWriter("json_log_multi.txt", 1, 3, 1, false),
+		logger.WithAppName("JsonLoggerMulti"),
+	)
+
+	loggerJsonMulti.Info("Log em JSON", "user", "jane_doe", "action", "login")
+	loggerJsonMulti.Warn("Log de aviso em JSON", "foo", "bar", "status", "processing")
+	loggerJsonMulti.Error("Log de erro em JSON", "err", "Erro ao processar requisição", "code", 500)
 
 }
