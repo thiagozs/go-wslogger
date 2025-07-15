@@ -97,16 +97,11 @@ func parseLogArgs(args ...interface{}) (string, []KeyValuePair) {
 	}
 	mainMsg := fmt.Sprint(args[0])
 	var extras []KeyValuePair
-	if len(args) > 1 {
-		limit := len(args)
-		if limit%2 != 0 {
-			limit-- // ignora o último se não estiver em par
-		}
-		for i := 1; i < limit; i += 2 {
-			key := fmt.Sprint(args[i])
-			value := formatValue(args[i+1])
-			extras = append(extras, KeyValuePair{key, value})
-		}
+	n := len(args)
+	for i := 1; i+1 < n; i += 2 {
+		key := fmt.Sprint(args[i])
+		value := formatValue(args[i+1])
+		extras = append(extras, KeyValuePair{key, value})
 	}
 	return mainMsg, extras
 }
