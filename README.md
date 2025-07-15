@@ -1,4 +1,4 @@
-# go-wslogger - wrapper slog
+# go-logger - wrapper slog
 
 `wslogger` is a versatile logging package for Go, providing an easy-to-use interface for structured logging with support for different output formats and log levels. It is built on top of the `slog` package and offers additional features like buffered logging and group-based logging. 
 
@@ -14,43 +14,43 @@
 
 ## Installation
 
-To install `wslogger`, use `go get`:
+To install `logger`, use `go get`:
 
 ```bash
-go get github.com/thiagozs/go-wslogger
+go get github.com/thiagozs/go-logger
 ```
 
 ## Usage
 
-Here is a simple example of how to use `wslogger`:
+Here is a simple example of how to use `logger`:
 
 ```go
 package main
 
 import (
-    "github.com/yourusername/wslogger"
+    "github.com/thiagozs/go-logger"
 )
 
 func main() {
-    opts := wslogger.Options{}
-    logger, err := wslogger.NewWsLogger(opts...)
+    opts := logger.Options{}
+    log, err := logger.NewWsLogger(opts...)
     if err != nil {
         panic(err)
     }
 
-    logger.Info("Application started")
-    logger.WithGroup("database").Debug("Database connection established")
+    log.Info("Application started")
+    log.WithGroup("database").Debug("Database connection established")
 }
 ```
 
 ## Configuration
 
-You can customize `WsLogger` by passing various options:
+You can customize `Logger` by passing various options:
 
 ```go
-logger, err := wslogger.NewWsLogger(
-    wslogger.WithKind(wslogger.File),
-    wslogger.WithFileName("app.log"),
+log, err := logger.NewWsLogger(
+    log.WithKind(logger.File),
+    log.WithFileName("app.log"),
 )
 ```
 
@@ -58,4 +58,4 @@ logger, err := wslogger.NewWsLogger(
 
 Our version numbers follow the [semantic versioning specification](http://semver.org/). You can see the available versions by checking the [tags on this repository](https://github.com/thiagozs/go-wslogger/tags). For more details about our license model, please take a look at the [LICENSE.md](LICENSE.md) file.
 
-2024, thiagozs
+2025, thiagozs
