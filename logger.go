@@ -101,9 +101,13 @@ func WithRotatingFile(filename string, maxSizeMB, maxBackups, maxAgeDays int, co
 }
 
 func WithMultiWriter(filename string, maxSizeMB, maxBackups, maxAgeDays int, compress bool) Option {
+	return WithMultiWriterTo(os.Stdout, filename, maxSizeMB, maxBackups, maxAgeDays, compress)
+}
+
+func WithMultiWriterTo(w io.Writer, filename string, maxSizeMB, maxBackups, maxAgeDays int, compress bool) Option {
 	return func(l *Logger) {
 		l.writer = io.MultiWriter(
-			os.Stdout,
+			w,
 			&lumberjack.Logger{
 				Filename:   filename,
 				MaxSize:    maxSizeMB,

@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"os"
@@ -279,5 +280,53 @@ func TestLogger_LogRotation(t *testing.T) {
 
 	if !foundBackup {
 		t.Error("Arquivo de backup (rotacionado) não foi criado")
+	}
+}
+
+func TestLogger_MultiWriter(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "testmulti.log")
+
+	// Buffer para capturar a "tela"
+	var buf strings.Builder
+
+	log := NewLogger(
+		WithJSON(true),
+		WithMultiWriterTo(&buf, logFile, 1, 1, 1, false),
+	)
+
+	// Escreve alguns logs
+	log.Info("Log multi", "user", "john", "action", "test")
+
+	// Lê do buffer
+	outStr := buf.String()
+	if !strings.Contains(outStr, "\"user\":\"john\"") {
+		t.Errorf("Buffer não contém log esperado: %q", outStr)
+	}
+
+	// Dá um tempinho para o lumberjack garantir flush
+	time.Sleep(time.Second * 1)
+
+	file, err := os.Open(logFile)
+	if err != nil {
+		t.Fatalf("Falha ao abrir arquivo de log: %v", err)
+	}
+	defer file.Close()
+
+	// Procura a mesma mensagem no arquivo
+	scanner := bufio.NewScanner(file)
+	found := false
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "\"user\":\"john\"") {
+			found = true
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("Erro ao ler arquivo de log: %v", err)
+	}
+	if !found {
+		t.Error("Arquivo de log não contém a mensagem esperada")
 	}
 }

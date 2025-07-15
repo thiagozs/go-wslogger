@@ -28,7 +28,7 @@ func main() {
 	logr.ErrorCtx(ctx, "Log de erro com span", "err", "Falha na conexão", "retry", 3)
 	span.End()
 
-	// Exemplo de logger com JSON.
+	// Exemplo de logger com JSON (somente rotacionando sem stdout).
 	loggerJson := logger.NewLogger(
 		logger.WithJSON(true),
 		logger.WithRotatingFile("json_log.txt", 1, 3, 1, false),
@@ -39,6 +39,7 @@ func main() {
 	loggerJson.Warn("Log de aviso em JSON", "foo", "bar", "status", "processing")
 	loggerJson.Error("Log de erro em JSON", "err", "Erro ao processar requisição", "code", 500)
 
+	// Examplo de logger com JSON (rotacionando e com stdout)
 	loggerJsonMulti := logger.NewLogger(
 		logger.WithJSON(true),
 		logger.WithMultiWriter("json_log_multi.txt", 1, 3, 1, false),
