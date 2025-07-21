@@ -25,8 +25,8 @@ func main() {
 	// Exemplo com span ativo usando o SDK do OTEL.
 	tracer := sdk.NewTracerProvider().Tracer("example")
 	ctx, span := tracer.Start(ctx, "dummySpan")
-	logr.ErrorCtx(ctx, "Log de erro com span", "err", "Falha na conexão", "retry", 3)
-	span.End()
+	defer span.End()
+	logr.ErrorCtx(ctx, "Log de erro com SPAN", "err", "Falha na conexão", "retry", 3)
 
 	// Exemplo de logger com JSON (somente rotacionando sem stdout).
 	loggerJson := logger.NewLogger(
