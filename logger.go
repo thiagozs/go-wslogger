@@ -32,7 +32,7 @@ type Logger struct {
 
 // Valores default.
 const (
-	defaultFormat  = "[{time}] [{app_name}] [{caller}] [{level}] {message}{extra}"
+	defaultFormat  = "[{time}] [{app_name}] [{caller}] [{level}] {message} {extra}"
 	defaultAppName = "MyApp"
 )
 
