@@ -1,4 +1,4 @@
-module github.com/thiagozs/go-logger
+module github.com/thiagozs/go-wslogger
 
 go 1.23.6
 

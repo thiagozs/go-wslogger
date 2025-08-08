@@ -1,4 +1,4 @@
-package logger
+package wslogger
 
 import (
 	"context"

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	logger "github.com/thiagozs/go-logger"
+	logger "github.com/thiagozs/go-wslogger"
 	sdk "go.opentelemetry.io/otel/sdk/trace"
 )
 
