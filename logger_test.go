@@ -67,6 +67,46 @@ func TestLogger_BasicOutput(t *testing.T) {
 	buf.Reset()
 }
 
+func TestLogger_Settings(t *testing.T) {
+	l := NewLogger()
+
+	// Testa SetAppName
+	l.SetAppName("MyService")
+	if l.appName != "MyService" {
+		t.Errorf("SetAppName falhou: esperado 'MyService', obteve '%s'", l.appName)
+	}
+
+	// Testa SetColor
+	l.SetColor(false)
+	if l.color != false {
+		t.Errorf("SetColor falhou: esperado false, obteve %v", l.color)
+	}
+	l.SetColor(true)
+	if l.color != true {
+		t.Errorf("SetColor falhou: esperado true, obteve %v", l.color)
+	}
+
+	// Testa SetJSON
+	l.SetJSON(true)
+	if l.jsonMode != true {
+		t.Errorf("SetJSON falhou: esperado true, obteve %v", l.jsonMode)
+	}
+	l.SetJSON(false)
+	if l.jsonMode != false {
+		t.Errorf("SetJSON falhou: esperado false, obteve %v", l.jsonMode)
+	}
+
+	// Testa SetIncludeSpanAttrs
+	l.SetIncludeSpanAttrs(true)
+	if l.includeSpanAttrs != true {
+		t.Errorf("SetIncludeSpanAttrs falhou: esperado true, obteve %v", l.includeSpanAttrs)
+	}
+	l.SetIncludeSpanAttrs(false)
+	if l.includeSpanAttrs != false {
+		t.Errorf("SetIncludeSpanAttrs falhou: esperado false, obteve %v", l.includeSpanAttrs)
+	}
+}
+
 func TestLogger_CustomFormat(t *testing.T) {
 	var buf strings.Builder
 	l := NewLogger(

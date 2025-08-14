@@ -324,6 +324,22 @@ func (l *Logger) logInternal(level, msg string,
 	fmt.Fprintln(l.writer, output)
 }
 
+func (l *Logger) SetAppName(name string) {
+	l.appName = name
+}
+
+func (l *Logger) SetColor(enabled bool) {
+	l.color = enabled
+}
+
+func (l *Logger) SetJSON(enabled bool) {
+	l.jsonMode = enabled
+}
+
+func (l *Logger) SetIncludeSpanAttrs(enabled bool) {
+	l.includeSpanAttrs = enabled
+}
+
 // Métodos de log sem contexto.
 func (l *Logger) Info(args ...any)  { l.logWithArgs("INFO", args, context.Background()) }
 func (l *Logger) Warn(args ...any)  { l.logWithArgs("WARN", args, context.Background()) }
