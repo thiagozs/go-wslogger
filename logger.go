@@ -175,11 +175,22 @@ func (l *Logger) formatMessage(level, msg, extra string, t time.Time,
 		level = colorCode + level + colorReset
 	}
 
+	// Aplica cor apenas ao valor de trace_id/span_id se colorido
 	if traceID != "" {
-		traceID = "trace_id=" + traceID
+		val := strings.TrimPrefix(traceID, "trace_id=")
+		if l.color {
+			traceID = colorCode + "trace_id" + colorCode + colorReset + "=" + val
+		} else {
+			traceID = "trace_id=" + val
+		}
 	}
 	if spanID != "" {
-		spanID = "span_id=" + spanID
+		val := strings.TrimPrefix(spanID, "span_id=")
+		if l.color {
+			spanID = colorCode + "span_id" + colorCode + colorReset + "=" + val
+		} else {
+			spanID = "span_id=" + val
+		}
 	}
 
 	replacements := map[string]string{
@@ -199,12 +210,38 @@ func (l *Logger) formatMessage(level, msg, extra string, t time.Time,
 		}
 		formatted = strings.ReplaceAll(formatted, placeholder, value)
 	}
+
 	// Remove {extra} se não houver extras
 	if extra != "" {
 		formatted = strings.ReplaceAll(formatted, "{extra}", extra)
 	} else {
 		formatted = strings.ReplaceAll(formatted, "{extra}", "")
+		formatted = formatted[:len(formatted)-1]
 	}
+
+	// Garante que trace_id/span_id sempre aparecem se OTel estiver presente
+	// (ou seja, se traceID ou spanID não estão vazios)
+	appendFields := []string{}
+	if traceID != "" || spanID != "" {
+		hasTrace := strings.Contains(formatted, "trace_id=")
+		hasSpan := strings.Contains(formatted, "span_id=")
+		if !hasTrace && traceID != "" {
+			appendFields = append(appendFields, traceID)
+		}
+		if !hasSpan && spanID != "" {
+			appendFields = append(appendFields, spanID)
+		}
+		if len(appendFields) > 0 {
+			// Remove todos os espaços extras do final
+			formatted = strings.TrimRight(formatted, " ")
+			// Se não terminar com espaço, adiciona um
+			if len(formatted) > 0 && formatted[len(formatted)-1] != ' ' {
+				formatted += " "
+			}
+			formatted += strings.Join(appendFields, " ")
+		}
+	}
+
 	return formatted
 }
 
