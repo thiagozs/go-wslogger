@@ -67,6 +67,23 @@ func TestLogger_BasicOutput(t *testing.T) {
 	buf.Reset()
 }
 
+func TestLogger_ExtraAnchorNotPresentWhenNoExtras(t *testing.T) {
+	var buf strings.Builder
+	l := NewLogger(
+		WithWriter(&buf),
+		WithAppName("NoExtraTest"),
+		WithColor(false),
+	)
+	l.Info("log sem extras")
+	out := buf.String()
+	if strings.Contains(out, "{extra}") {
+		t.Errorf("A âncora {extra} apareceu no log sem extras: %q", out)
+	}
+	if strings.Contains(out, "extra=") {
+		t.Errorf("A string 'extra=' apareceu no log sem extras: %q", out)
+	}
+}
+
 func TestLogger_LogfMethods(t *testing.T) {
 	var buf strings.Builder
 	l := NewLogger(

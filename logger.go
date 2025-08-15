@@ -190,7 +190,6 @@ func (l *Logger) formatMessage(level, msg, extra string, t time.Time,
 		"{message}":  msg,
 		"{trace_id}": traceID,
 		"{span_id}":  spanID,
-		"{extra}":    extra,
 	}
 
 	formatted := l.format
@@ -199,6 +198,12 @@ func (l *Logger) formatMessage(level, msg, extra string, t time.Time,
 			continue
 		}
 		formatted = strings.ReplaceAll(formatted, placeholder, value)
+	}
+	// Remove {extra} se não houver extras
+	if extra != "" {
+		formatted = strings.ReplaceAll(formatted, "{extra}", extra)
+	} else {
+		formatted = strings.ReplaceAll(formatted, "{extra}", "")
 	}
 	return formatted
 }
