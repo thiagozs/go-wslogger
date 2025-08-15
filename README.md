@@ -1,56 +1,91 @@
-# go-logger - wrapper slog
 
-`wslogger` is a versatile logging package for Go, providing an easy-to-use interface for structured logging with support for different output formats and log levels. It is built on top of the `slog` package and offers additional features like buffered logging and group-based logging. 
+# wslogger
 
-* ***(working in progress)***
+`wslogger` is a flexible and modern logging package for Go, supporting structured logs, multiple formats, log rotation, OpenTelemetry context, and more.
 
 ## Features
 
-- Support for multiple log formats: JSON, text, etc.
-- Log level control: Info, Debug, Error, Warn.
-- Buffered logging for improved performance.
-- Group-based logging to categorize log messages.
-- Flexible configuration with various output options: Stdout, File.
+- Multiple log formats: JSON, text (customizable)
+- Log levels: Info, Warn, Error, Debug
+- Context-aware logging (OpenTelemetry support)
+- Log rotation (via lumberjack)
+- Color output (optional)
+- Easy configuration via options
 
 ## Installation
 
-To install `logger`, use `go get`:
-
 ```bash
-go get github.com/thiagozs/go-logger
+go get github.com/thiagozs/go-wslogger
 ```
 
 ## Usage
-
-Here is a simple example of how to use `logger`:
 
 ```go
 package main
 
 import (
-    "github.com/thiagozs/go-logger"
+    "context"
+    "github.com/thiagozs/go-wslogger"
 )
 
 func main() {
-    opts := logger.Options{}
-    log, err := logger.NewWsLogger(opts...)
-    if err != nil {
-        panic(err)
-    }
+    log := wslogger.NewLogger(
+        wslogger.WithAppName("MyApp"),
+        wslogger.WithColor(true),
+        wslogger.WithFormat("[{time}] [{app_name}] [{level}] {message} {extra}"),
+    )
 
-    log.Info("Application started")
-    log.WithGroup("database").Debug("Database connection established")
+    log.Info("App started")
+    log.Warn("Warning message", "user", "john")
+    log.Errorf("Error: %s", "something failed")
+    log.Debugf("Debug value: %d", 42)
+
+    // Logging with context (OpenTelemetry)
+    ctx := context.Background()
+    log.InfoCtx(ctx, "Info with context")
+    log.ErrorCtxf(ctx, "Error with wrap: %w", fmt.Errorf("original error"))
 }
 ```
 
-## Configuration
+## API Highlights
 
-You can customize `Logger` by passing various options:
+### Main Methods
+
+- `Info(args ...any)`
+- `Warn(args ...any)`
+- `Error(args ...any)`
+- `Debug(args ...any)`
+- `Infof(format string, args ...any)`
+- `Warnf(format string, args ...any)`
+- `Errorf(format string, args ...any)`
+- `Debugf(format string, args ...any)`
+- `InfoCtx(ctx, args ...any)`
+- `WarnCtx(ctx, args ...any)`
+- `ErrorCtx(ctx, args ...any)`
+- `DebugCtx(ctx, args ...any)`
+- `InfoCtxf(ctx, format, args...)`
+- `WarnCtxf(ctx, format, args...)`
+- `ErrorCtxf(ctx, format, args...)` (supports `%w`)
+- `DebugCtxf(ctx, format, args...)`
+
+### Configuration Options
+
+- `WithAppName(name string)`
+- `WithColor(enabled bool)`
+- `WithFormat(format string)`
+- `WithJSON(enabled bool)`
+- `WithWriter(w io.Writer)`
+- `WithRotatingFile(filename string, maxSizeMB, maxBackups, maxAgeDays int, compress bool)`
+- `WithSpanAttributes(enabled bool)`
+
+## Example of Advanced Configuration
 
 ```go
-log, err := logger.NewWsLogger(
-    log.WithKind(logger.File),
-    log.WithFileName("app.log"),
+log := wslogger.NewLogger(
+    wslogger.WithAppName("ServiceX"),
+    wslogger.WithColor(false),
+    wslogger.WithJSON(true),
+    wslogger.WithRotatingFile("service.log", 10, 5, 30, true),
 )
 ```
 
