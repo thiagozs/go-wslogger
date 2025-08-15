@@ -256,7 +256,23 @@ func (l *Logger) getCaller(skip int) string {
 	if fn != nil {
 		funcName = path.Base(fn.Name())
 	}
+	gid := getGID()
+	if gid > 0 {
+		return fmt.Sprintf("%s:%d,%s goroutine=%d", fileBase, line, funcName, gid)
+	}
 	return fmt.Sprintf("%s:%d,%s", fileBase, line, funcName)
+}
+
+// getGID retorna o ID da goroutine atual (não oficial, mas seguro para logging)
+func getGID() int64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	var gid int64
+	_, err := fmt.Sscanf(string(buf[:n]), "goroutine %d ", &gid)
+	if err != nil {
+		return -1
+	}
+	return gid
 }
 
 // JSON struct para output
