@@ -349,16 +349,32 @@ func (l *Logger) SetIncludeSpanAttrs(enabled bool) {
 
 // Métodos de log com formatação estilo fmt.Sprintf
 func (l *Logger) Infof(format string, args ...any) {
-	l.logWithArgs("INFO", []any{fmt.Sprintf(format, args...)}, context.Background())
+	msg := fmt.Sprintf(format, args...)
+	if strings.Contains(format, "%w") {
+		msg = fmt.Errorf(format, args...).Error()
+	}
+	l.logWithArgs("INFO", []any{msg}, context.Background())
 }
 func (l *Logger) Warnf(format string, args ...any) {
-	l.logWithArgs("WARN", []any{fmt.Sprintf(format, args...)}, context.Background())
+	msg := fmt.Sprintf(format, args...)
+	if strings.Contains(format, "%w") {
+		msg = fmt.Errorf(format, args...).Error()
+	}
+	l.logWithArgs("WARN", []any{msg}, context.Background())
 }
 func (l *Logger) Errorf(format string, args ...any) {
-	l.logWithArgs("ERROR", []any{fmt.Sprintf(format, args...)}, context.Background())
+	msg := fmt.Sprintf(format, args...)
+	if strings.Contains(format, "%w") {
+		msg = fmt.Errorf(format, args...).Error()
+	}
+	l.logWithArgs("ERROR", []any{msg}, context.Background())
 }
 func (l *Logger) Debugf(format string, args ...any) {
-	l.logWithArgs("DEBUG", []any{fmt.Sprintf(format, args...)}, context.Background())
+	msg := fmt.Sprintf(format, args...)
+	if strings.Contains(format, "%w") {
+		msg = fmt.Errorf(format, args...).Error()
+	}
+	l.logWithArgs("DEBUG", []any{msg}, context.Background())
 }
 
 func (l *Logger) Info(args ...any)  { l.logWithArgs("INFO", args, context.Background()) }
@@ -371,6 +387,37 @@ func (l *Logger) InfoCtx(ctx context.Context, args ...any)  { l.logWithArgs("INF
 func (l *Logger) WarnCtx(ctx context.Context, args ...any)  { l.logWithArgs("WARN", args, ctx) }
 func (l *Logger) ErrorCtx(ctx context.Context, args ...any) { l.logWithArgs("ERROR", args, ctx) }
 func (l *Logger) DebugCtx(ctx context.Context, args ...any) { l.logWithArgs("DEBUG", args, ctx) }
+
+func (l *Logger) InfoCtxf(ctx context.Context, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	if strings.Contains(format, "%w") {
+		msg = fmt.Errorf(format, args...).Error()
+	}
+	l.logWithArgs("INFO", []any{msg}, ctx)
+}
+func (l *Logger) WarnCtxf(ctx context.Context, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	if strings.Contains(format, "%w") {
+		msg = fmt.Errorf(format, args...).Error()
+	}
+	l.logWithArgs("WARN", []any{msg}, ctx)
+}
+func (l *Logger) ErrorCtxf(ctx context.Context, format string, args ...any) {
+	if strings.Contains(format, "%w") {
+		msg := fmt.Errorf(format, args...).Error()
+		l.logWithArgs("ERROR", []any{msg}, ctx)
+		return
+	}
+	msg := fmt.Sprintf(format, args...)
+	l.logWithArgs("ERROR", []any{msg}, ctx)
+}
+func (l *Logger) DebugCtxf(ctx context.Context, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	if strings.Contains(format, "%w") {
+		msg = fmt.Errorf(format, args...).Error()
+	}
+	l.logWithArgs("DEBUG", []any{msg}, ctx)
+}
 
 func (l *Logger) logWithArgs(level string, args []any, ctx context.Context) {
 	msg, extras := parseLogArgs(args...)

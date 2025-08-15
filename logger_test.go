@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -113,6 +114,47 @@ func TestLogger_LogfMethods(t *testing.T) {
 	l.Debugf("debug: %v", map[string]int{"a": 1})
 	if !strings.Contains(buf.String(), "debug: map[a:1]") || !strings.Contains(buf.String(), "[DEBUG]") {
 		t.Errorf("Debugf output inválido: %q", buf.String())
+	}
+}
+
+func TestLogger_LogCtxfMethods(t *testing.T) {
+	var buf strings.Builder
+	l := NewLogger(
+		WithWriter(&buf),
+		WithAppName("FmtTestCtx"),
+		WithColor(false),
+	)
+	ctx := context.Background()
+
+	err := fmt.Errorf("original error")
+	l.InfoCtxf(ctx, "info: %d + %d = %d", 2, 3, 5)
+	if !strings.Contains(buf.String(), "info: 2 + 3 = 5") || !strings.Contains(buf.String(), "[INFO]") {
+		t.Errorf("InfoCtxf output inválido: %q", buf.String())
+	}
+	buf.Reset()
+
+	l.WarnCtxf(ctx, "warn: %s", "something happened!")
+	if !strings.Contains(buf.String(), "warn: something happened!") || !strings.Contains(buf.String(), "[WARN]") {
+		t.Errorf("WarnCtxf output inválido: %q", buf.String())
+	}
+	buf.Reset()
+
+	l.Errorf("error: %.2f", 3.1415)
+	if !strings.Contains(buf.String(), "error: 3.14") || !strings.Contains(buf.String(), "[ERROR]") {
+		t.Errorf("ErrorCtxf output inválido: %q", buf.String())
+	}
+	buf.Reset()
+
+	l.DebugCtxf(ctx, "debug: %v", map[string]int{"a": 1})
+	if !strings.Contains(buf.String(), "debug: map[a:1]") || !strings.Contains(buf.String(), "[DEBUG]") {
+		t.Errorf("DebugCtxf output inválido: %q", buf.String())
+	}
+	buf.Reset()
+
+	// Testa %w
+	l.ErrorCtxf(ctx, "wrap: %w", err)
+	if !strings.Contains(buf.String(), "wrap: original error") {
+		t.Errorf("ErrorCtxf com %%w não funcionou: %q", buf.String())
 	}
 }
 
