@@ -341,6 +341,21 @@ func (l *Logger) SetIncludeSpanAttrs(enabled bool) {
 }
 
 // Métodos de log sem contexto.
+
+// Métodos de log com formatação estilo fmt.Sprintf
+func (l *Logger) Infof(format string, args ...any) {
+	l.logWithArgs("INFO", []any{fmt.Sprintf(format, args...)}, context.Background())
+}
+func (l *Logger) Warnf(format string, args ...any) {
+	l.logWithArgs("WARN", []any{fmt.Sprintf(format, args...)}, context.Background())
+}
+func (l *Logger) Errorf(format string, args ...any) {
+	l.logWithArgs("ERROR", []any{fmt.Sprintf(format, args...)}, context.Background())
+}
+func (l *Logger) Debugf(format string, args ...any) {
+	l.logWithArgs("DEBUG", []any{fmt.Sprintf(format, args...)}, context.Background())
+}
+
 func (l *Logger) Info(args ...any)  { l.logWithArgs("INFO", args, context.Background()) }
 func (l *Logger) Warn(args ...any)  { l.logWithArgs("WARN", args, context.Background()) }
 func (l *Logger) Error(args ...any) { l.logWithArgs("ERROR", args, context.Background()) }
