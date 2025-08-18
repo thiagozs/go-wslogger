@@ -1,2 +1,0 @@
-?? .git-action.txt
-?? .git-status.txt
