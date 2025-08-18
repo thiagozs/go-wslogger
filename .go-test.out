@@ -1,0 +1,40 @@
+?   	github.com/thiagozs/go-wslogger/examples/default	[no test files]
+?   	github.com/thiagozs/go-wslogger/examples/goroutine	[no test files]
+=== RUN   TestLogger_GoroutineCreationCaller
+    logger_goroutine_caller_test.go:34: goroutine criada em /home/thiagozs/workspace/go-wslogger/logger_goroutine_caller_test.go:28
+    logger_goroutine_caller_test.go:34: goroutine criada em /home/thiagozs/workspace/go-wslogger/logger_goroutine_caller_test.go:28
+    logger_goroutine_caller_test.go:34: goroutine criada em /home/thiagozs/workspace/go-wslogger/logger_goroutine_caller_test.go:28
+    logger_goroutine_caller_test.go:34: goroutine criada em /home/thiagozs/workspace/go-wslogger/logger_goroutine_caller_test.go:28
+    logger_goroutine_caller_test.go:34: goroutine criada em /home/thiagozs/workspace/go-wslogger/logger_goroutine_caller_test.go:28
+--- PASS: TestLogger_GoroutineCreationCaller (0.00s)
+=== RUN   TestLogger_BasicOutput
+--- PASS: TestLogger_BasicOutput (0.00s)
+=== RUN   TestLogger_ExtraAnchorNotPresentWhenNoExtras
+--- PASS: TestLogger_ExtraAnchorNotPresentWhenNoExtras (0.00s)
+=== RUN   TestLogger_LogfMethods
+--- PASS: TestLogger_LogfMethods (0.00s)
+=== RUN   TestLogger_LogCtxfMethods
+--- PASS: TestLogger_LogCtxfMethods (0.00s)
+=== RUN   TestLogger_Settings
+--- PASS: TestLogger_Settings (0.00s)
+=== RUN   TestLogger_CustomFormat
+--- PASS: TestLogger_CustomFormat (0.00s)
+=== RUN   TestLogger_ColorOutput
+--- PASS: TestLogger_ColorOutput (0.00s)
+=== RUN   TestLogger_ExtraArgsOdd
+--- PASS: TestLogger_ExtraArgsOdd (0.00s)
+=== RUN   TestLogger_WithOtelSpan
+--- PASS: TestLogger_WithOtelSpan (0.00s)
+=== RUN   TestLogger_JSONOutput
+--- PASS: TestLogger_JSONOutput (0.00s)
+=== RUN   TestLogger_JSON_WithSpanAttributes
+--- PASS: TestLogger_JSON_WithSpanAttributes (0.00s)
+=== RUN   TestLogger_LogRotation
+    logger_test.go:393: Arquivo: testlog-2025-08-18T18-35-35.477.log (1048210 bytes)
+    logger_test.go:393: Arquivo: testlog-2025-08-18T18-35-35.482.log (615680 bytes)
+    logger_test.go:393: Arquivo: testlog.log (0 bytes)
+--- PASS: TestLogger_LogRotation (0.52s)
+=== RUN   TestLogger_MultiWriter
+--- PASS: TestLogger_MultiWriter (1.00s)
+PASS
+ok  	github.com/thiagozs/go-wslogger	1.525s

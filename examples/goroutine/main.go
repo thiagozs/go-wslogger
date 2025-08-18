@@ -1,40 +1,47 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"time"
-
-	"runtime"
 
 	logger "github.com/thiagozs/go-wslogger"
 )
 
 // Helper para criar goroutine capturando local de criação
-func GoWithCaller(fn func(file string, line int)) {
-	_, file, line, _ := runtime.Caller(1)
-	go fn(file, line)
+func GoRoutineCall(wg *sync.WaitGroup, log *logger.Logger) {
+	// usa o wrapper do logger para capturar o ponto de criação
+	//g := log.WrapGoroutine()
+	go func(wg *sync.WaitGroup, lg *logger.Logger) {
+		defer wg.Done()
+		log.Info("executando GoRoutineCall <> dentro da goroutine")
+	}(wg, log)
+}
+
+func GoRoutineCall2(wg *sync.WaitGroup, log *logger.Logger) {
+	go func(wg *sync.WaitGroup, lg *logger.Logger) {
+		defer wg.Done()
+		log.Info("executando GoRoutineCall2 :: dentro da goroutine")
+	}(wg, log)
 }
 
 func main() {
 	log := logger.NewLogger(
-		logger.WithFormat("{caller} {message} {extra}"),
 		logger.WithColor(false),
 		logger.WithWriter(os.Stdout),
 	)
 	var wg sync.WaitGroup
 
-	logInGoroutine := func(file string, line int) {
-		defer wg.Done()
-		// Passa o local de criação como extra para o logger
-		log.Info("executando dentro da goroutine", "goroutine_caller", fmt.Sprintf("%s:%d", file, line))
+	wg.Add(3)
+	for range 3 {
+		GoRoutineCall(&wg, log)
 	}
 
 	wg.Add(3)
-	for i := 0; i < 3; i++ {
-		GoWithCaller(logInGoroutine)
+	for range 3 {
+		GoRoutineCall2(&wg, log)
 	}
+
 	wg.Wait()
 
 	// Log normal para comparação
