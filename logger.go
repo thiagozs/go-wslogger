@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
+	"path"
 	"runtime"
 	"strings"
 	"time"
@@ -108,13 +108,13 @@ func formatCaller(rf *runtime.Frame, flag uint8, custom CallerFormatFn) string {
 		if j >= 0 {
 			i += j + 1
 		}
-		return rf.Function[:i+1] + "," + filepath.Base(rf.File) + ":" + lineNum
+		return rf.Function[:i+1] + "," + path.Base(rf.File) + ":" + lineNum
 	case CallerFlagFnlFcn:
 		ss := strings.Split(rf.Function, ".")
 		fn := ss[len(ss)-1]
-		return filepath.Base(rf.File) + ":" + lineNum + "," + fn
+		return path.Base(rf.File) + ":" + lineNum + "," + fn
 	case CallerFlagFnLine:
-		return filepath.Base(rf.File) + ":" + lineNum
+		return path.Base(rf.File) + ":" + lineNum
 	case CallerFlagFcName:
 		ss := strings.Split(rf.Function, ".")
 		return ss[len(ss)-1]
