@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/natefinch/lumberjack"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -30,6 +29,30 @@ type Logger struct {
 	includeSpanAttrs bool
 }
 
+// WithWriter permite configurar o destino de saída do logger.
+func WithWriter(w io.Writer) Option {
+	return func(l *Logger) {
+		if w != nil {
+			l.writer = w
+		}
+	}
+}
+
+// Flags para formato do caller
+const (
+	CallerFlagFull   uint8 = iota // função,arquivo:linha
+	CallerFlagFunc                // função
+	CallerFlagFcLine              // função:linha
+	CallerFlagPkg                 // pacote
+	CallerFlagPkgFnl              // pacote,arquivo:linha
+	CallerFlagFnlFcn              // arquivo:linha,função
+	CallerFlagFnLine              // arquivo:linha
+	CallerFlagFcName              // nome da função
+	CallerFlagFpLine              // caminho/arquivo:linha
+)
+
+type CallerFormatFn func(*runtime.Frame) string
+
 // Valores default.
 const (
 	defaultFormat  = "[{time}] [{app_name}] [{caller}] [{level}] {message} {extra}"
@@ -45,30 +68,118 @@ const (
 	colorCyan   = "\033[36m"
 )
 
+// Funções utilitárias para caller e JSON
+func getCallerFrame(skip int) (runtime.Frame, bool) {
+	pcs := make([]uintptr, 32)
+	n := runtime.Callers(skip+2, pcs)
+	if n == 0 {
+		return runtime.Frame{}, false
+	}
+	frames := runtime.CallersFrames(pcs[:n])
+	frame, _ := frames.Next()
+	return frame, true
+}
+
+func formatCaller(rf *runtime.Frame, flag uint8, custom CallerFormatFn) string {
+	lineNum := fmt.Sprintf("%d", rf.Line)
+	if custom != nil {
+		return custom(rf)
+	}
+	switch flag {
+	case CallerFlagFull:
+		return rf.Function + "," + rf.File + ":" + lineNum
+	case CallerFlagFunc:
+		return rf.Function
+	case CallerFlagFcLine:
+		return rf.Function + ":" + lineNum
+	case CallerFlagPkg:
+		i := strings.LastIndex(rf.Function, "/")
+		if i == -1 {
+			return rf.Function
+		}
+		return rf.Function[:i]
+	case CallerFlagPkgFnl:
+		// tenta extrair pacote + arquivo:linha
+		i := strings.LastIndex(rf.Function, "/")
+		if i == -1 {
+			i = 0
+		}
+		j := strings.IndexByte(rf.Function[i+1:], '.')
+		if j >= 0 {
+			i += j + 1
+		}
+		return rf.Function[:i+1] + "," + filepath.Base(rf.File) + ":" + lineNum
+	case CallerFlagFnlFcn:
+		ss := strings.Split(rf.Function, ".")
+		fn := ss[len(ss)-1]
+		return filepath.Base(rf.File) + ":" + lineNum + "," + fn
+	case CallerFlagFnLine:
+		return filepath.Base(rf.File) + ":" + lineNum
+	case CallerFlagFcName:
+		ss := strings.Split(rf.Function, ".")
+		return ss[len(ss)-1]
+	default: // CallerFlagFpLine
+		return rf.File + ":" + lineNum
+	}
+}
+
+func (l *Logger) logInternalJSON(level, msg string, extras []KeyValuePair, ctx context.Context) {
+	now := time.Now()
+	var traceID, spanID string
+	var extraMap map[string]string
+	if span := trace.SpanFromContext(ctx); span != nil {
+		sc := span.SpanContext()
+		if sc.IsValid() {
+			traceID = sc.TraceID().String()
+			spanID = sc.SpanID().String()
+		}
+		if l.includeSpanAttrs {
+			extraMap = spanAttributesToMap(span)
+		}
+	}
+	if extraMap == nil {
+		extraMap = make(map[string]string)
+	}
+	for _, kv := range extras {
+		extraMap[kv.key] = kv.value
+	}
+	// Se o criador da goroutine passou o local como extra, usa ele
+	caller := ""
+	for _, kv := range extras {
+		if kv.key == "goroutine_caller" {
+			caller = kv.value
+			break
+		}
+	}
+	if caller == "" {
+		caller = l.getCaller(6)
+	}
+	record := logJSON{
+		Time:    now.Format("2006-01-02 15:04:05"),
+		Level:   level,
+		App:     l.appName,
+		Caller:  caller,
+		Message: msg,
+		TraceID: traceID,
+		SpanID:  spanID,
+		Extra:   extraMap,
+	}
+	data, _ := json.Marshal(record)
+	fmt.Fprintln(l.writer, string(data))
+}
+
 // ==== Options ======
+
 func NewLogger(opts ...Option) *Logger {
 	l := &Logger{
 		writer:  os.Stdout,
 		format:  defaultFormat,
 		appName: defaultAppName,
-		color:   true,
 	}
 	for _, opt := range opts {
 		opt(l)
 	}
 	return l
-}
-
-func WithWriter(w io.Writer) Option {
-	return func(l *Logger) { l.writer = w }
-}
-
-func WithFormat(format string) Option {
-	return func(l *Logger) {
-		if format != "" {
-			l.format = format
-		}
-	}
 }
 
 func WithAppName(name string) Option {
@@ -81,6 +192,11 @@ func WithColor(enable bool) Option {
 
 func WithJSON(enable bool) Option {
 	return func(l *Logger) { l.jsonMode = enable }
+}
+
+// WithFormat permite configurar o template de saída do logger.
+func WithFormat(format string) Option {
+	return func(l *Logger) { l.format = format }
 }
 
 // Ativa/desativa captura automática de atributos do span OTel
@@ -245,34 +361,14 @@ func (l *Logger) formatMessage(level, msg, extra string, t time.Time,
 	return formatted
 }
 
+// getCaller com suporte a flags e função customizada
 func (l *Logger) getCaller(skip int) string {
-	pc, file, line, ok := runtime.Caller(skip)
+	frame, ok := getCallerFrame(skip)
 	if !ok {
 		return "unknown"
 	}
-	fileBase := path.Base(file)
-	fn := runtime.FuncForPC(pc)
-	funcName := "unknown"
-	if fn != nil {
-		funcName = path.Base(fn.Name())
-	}
-	gid := getGID()
-	if gid > 0 {
-		return fmt.Sprintf("%s:%d,%s goroutine=%d", fileBase, line, funcName, gid)
-	}
-	return fmt.Sprintf("%s:%d,%s", fileBase, line, funcName)
-}
-
-// getGID retorna o ID da goroutine atual (não oficial, mas seguro para logging)
-func getGID() int64 {
-	var buf [64]byte
-	n := runtime.Stack(buf[:], false)
-	var gid int64
-	_, err := fmt.Sscanf(string(buf[:n]), "goroutine %d ", &gid)
-	if err != nil {
-		return -1
-	}
-	return gid
+	// Você pode expor o flag como opção do Logger, aqui uso FnLine por padrão
+	return formatCaller(&frame, CallerFlagFnLine, nil)
 }
 
 // JSON struct para output
@@ -298,51 +394,6 @@ func spanAttributesToMap(span trace.Span) map[string]string {
 	return out
 }
 
-// ====== JSON Output ======
-func (l *Logger) logInternalJSON(level, msg string,
-	extras []KeyValuePair, ctx context.Context) {
-
-	now := time.Now()
-	var traceID, spanID string
-	span := trace.SpanFromContext(ctx)
-	if span != nil {
-		sc := span.SpanContext()
-		if sc.IsValid() {
-			traceID = sc.TraceID().String()
-			spanID = sc.SpanID().String()
-		}
-	}
-	caller := l.getCaller(6)
-
-	// Monta extras explícitos
-	extraMap := make(map[string]string, len(extras))
-	for _, kv := range extras {
-		extraMap[kv.key] = kv.value
-	}
-
-	// Mescla atributos do span, sem sobrescrever extras explícitos
-	if l.includeSpanAttrs && span != nil {
-		for k, v := range spanAttributesToMap(span) {
-			if _, exists := extraMap[k]; !exists {
-				extraMap[k] = v
-			}
-		}
-	}
-
-	record := logJSON{
-		Time:    now.Format(time.RFC3339),
-		Level:   level,
-		App:     l.appName,
-		Caller:  caller,
-		Message: msg,
-		TraceID: traceID,
-		SpanID:  spanID,
-		Extra:   extraMap,
-	}
-	data, _ := json.Marshal(record)
-	fmt.Fprintln(l.writer, string(data))
-}
-
 // ====== logInternal SWITCH ======
 func (l *Logger) logInternal(level, msg string,
 	extras []KeyValuePair, ctx context.Context) {
@@ -360,7 +411,17 @@ func (l *Logger) logInternal(level, msg string,
 			spanID = sc.SpanID().String()
 		}
 	}
-	caller := l.getCaller(6)
+	// permite que criadores de goroutine passem o caller como extra
+	caller := ""
+	for _, kv := range extras {
+		if kv.key == "goroutine_caller" {
+			caller = kv.value
+			break
+		}
+	}
+	if caller == "" {
+		caller = l.getCaller(6)
+	}
 
 	extraStr := ""
 	if len(extras) > 0 {
