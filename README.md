@@ -89,6 +89,42 @@ log := wslogger.NewLogger(
 )
 ```
 
+## Goroutines and callsite reporting
+
+By design it's not possible, in general, to reliably determine the exact source
+location (file:function:line) where a goroutine was created from inside the
+goroutine itself. The reliable approach is to capture the callsite at the
+moment the goroutine is spawned and attach it to subsequent log calls.
+
+This package provides a small helper to do that conveniently:
+
+- `g := log.WrapGoroutine()` — call this in the goroutine creator, then pass
+    `g` (a `*GoroutineLogger`) into the goroutine. Inside the goroutine use
+    `g.Info(...) / g.Infof(...)` etc. The helper captures the creation
+    callsite and automatically appends the `goroutine_caller` extra to log lines.
+
+Example:
+
+```go
+// creator
+g := log.WrapGoroutine()
+go func(lg *wslogger.GoroutineLogger) {
+        defer wg.Done()
+        lg.Info("started worker")
+}(g)
+```
+
+Notes & limitations:
+
+- `WrapGoroutine()` is best-effort: it tries to locate the `go` statement and
+    format the callsite as `basename:function:line`. In some cases (anonymous
+    closures, generated function names) the runtime will expose names like
+    `func1`; using `WrapGoroutine()` gives the most reliable, consistent
+    information because it captures the creator location at spawn time.
+- If you prefer not to change call sites, you can also manually pass
+    `"goroutine_caller", "file:func:line"` as an extra argument on log calls,
+    but that requires the creator to construct the string.
+
 ## Versioning and license
 
 Our version numbers follow the [semantic versioning specification](http://semver.org/). You can see the available versions by checking the [tags on this repository](https://github.com/thiagozs/go-wslogger/tags). For more details about our license model, please take a look at the [LICENSE.md](LICENSE.md) file.

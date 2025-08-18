@@ -1,0 +1,1 @@
+2367ab9 docs: document WrapGoroutine usage and goroutine callsite limitations
