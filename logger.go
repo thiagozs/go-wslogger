@@ -147,7 +147,16 @@ func (l *Logger) logInternalJSON(level, msg string, extras []KeyValuePair, ctx c
 	caller := ""
 	for _, kv := range extras {
 		if kv.key == "goroutine_caller" {
-			caller = kv.value
+			v := kv.value
+			// espera formato path:line, transforma em basename:line
+			if strings.Contains(v, ":") {
+				parts := strings.Split(v, ":")
+				line := parts[len(parts)-1]
+				path := strings.Join(parts[:len(parts)-1], ":")
+				caller = filepath.Base(path) + ":" + line
+			} else {
+				caller = filepath.Base(v)
+			}
 			break
 		}
 	}
