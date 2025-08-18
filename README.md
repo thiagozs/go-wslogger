@@ -89,12 +89,6 @@ log := wslogger.NewLogger(
 )
 ```
 
-## Versioning and license
-
-Our version numbers follow the [semantic versioning specification](http://semver.org/). You can see the available versions by checking the [tags on this repository](https://github.com/thiagozs/go-wslogger/tags). For more details about our license model, please take a look at the [LICENSE.md](LICENSE.md) file.
-
-2025, thiagozs
-
 ## Goroutines and callsite reporting
 
 By design it's not possible, in general, to reliably determine the exact source
@@ -131,3 +125,8 @@ Notes & limitations:
     `"goroutine_caller", "file:func:line"` as an extra argument on log calls,
     but that requires the creator to construct the string.
 
+## Versioning and license
+
+Our version numbers follow the [semantic versioning specification](http://semver.org/). You can see the available versions by checking the [tags on this repository](https://github.com/thiagozs/go-wslogger/tags). For more details about our license model, please take a look at the [LICENSE.md](LICENSE.md) file.
+
+2025, thiagozs
