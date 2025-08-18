@@ -3,3 +3,4 @@ json_log.txt
 json_log_multi.txt
 .git-*.txt
 .go-test.out
+.cur-branch.txt
